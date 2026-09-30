@@ -352,6 +352,73 @@ class WebRTCManager {
     return false;
   }
 
+  async toggleScreenShare(onStoppedCallback) {
+    if (this.isScreenSharing) {
+      await this.stopScreenShare();
+      if (onStoppedCallback) onStoppedCallback(false);
+      return false;
+    } else {
+      const stream = await this.startScreenShare(() => {
+        if (onStoppedCallback) onStoppedCallback(false);
+      });
+      return !!stream;
+    }
+  }
+
+  async startScreenShare(onNativeEnded) {
+    try {
+      this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: 'always' },
+        audio: false
+      });
+
+      const screenTrack = this.screenStream.getVideoTracks()[0];
+
+      // Replace video track in all active peer connections
+      this.peerConnections.forEach((pc) => {
+        const senders = pc.getSenders();
+        const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
+        if (videoSender) {
+          videoSender.replaceTrack(screenTrack);
+        }
+      });
+
+      screenTrack.onended = () => {
+        this.stopScreenShare();
+        if (onNativeEnded) onNativeEnded();
+      };
+
+      this.isScreenSharing = true;
+      return this.screenStream;
+    } catch (err) {
+      console.warn('Screen share cancelled or failed:', err);
+      this.isScreenSharing = false;
+      return null;
+    }
+  }
+
+  async stopScreenShare() {
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((t) => t.stop());
+      this.screenStream = null;
+    }
+    this.isScreenSharing = false;
+
+    // Restore camera video track to peers
+    if (this.localStream) {
+      const camTrack = this.localStream.getVideoTracks()[0];
+      if (camTrack) {
+        this.peerConnections.forEach((pc) => {
+          const senders = pc.getSenders();
+          const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
+          if (videoSender) {
+            videoSender.replaceTrack(camTrack);
+          }
+        });
+      }
+    }
+  }
+
   closePeer(targetUserId) {
     const pc = this.peerConnections.get(targetUserId);
     if (pc) {

@@ -1175,6 +1175,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: #FFFFFF;
 }
 
+.giant-btn.btn-screen-active {
+  background: #0284C7;
+  color: #FFFFFF;
+  box-shadow: 0 0 16px rgba(2, 132, 199, 0.6);
+}
+
+.giant-btn.btn-screen-off {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
 .giant-btn.btn-help-caregiver {
   background: #F97316;
   color: #FFFFFF;

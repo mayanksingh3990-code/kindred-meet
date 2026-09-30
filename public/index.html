@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Kindred Meet — Simple, Accessible Video Calling</title>
-  <meta name="description" content="Dead-simple video calling designed for seniors, grandparents, and kids. One-touch speed dial, giant high-contrast controls, device notifications, live captions, and shared drawing." />
+  <meta name="description" content="Dead-simple video calling designed for seniors, grandparents, and kids. Room word codes, screen sharing, giant high-contrast controls, live captions, and shared drawing." />
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="mode-senior">
@@ -62,61 +62,36 @@
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- =========================================================
-         SCREEN 1: WELCOME & SPEED-DIAL (HOME)
+         SCREEN 1: WELCOME & ROOM SELECTION (HOME)
          ========================================================= -->
     <main id="screen-home" class="screen active">
       <div class="home-container">
         <!-- Welcome Title -->
         <div class="welcome-header">
-          <h1 class="welcome-title">Who would you like to call today?</h1>
-          <p class="welcome-subtitle">Tap any family member below to start a call with one touch.</p>
+          <h1 class="welcome-title">Welcome to Kindred Meet</h1>
+          <p class="welcome-subtitle">Pick a room word or enter one to start your video call.</p>
         </div>
 
-        <!-- 1-Click Speed Dial Contacts -->
-        <section aria-labelledby="speed-dial-heading">
-          <div class="section-header-row">
-            <h2 id="speed-dial-heading" class="section-title">
-              <span>⚡</span>
-              <span>Family Speed Dial</span>
-            </h2>
-            <span class="section-badge">1-Tap Direct Call</span>
-          </div>
-          <div id="speed-dial-grid" class="speed-dial-grid">
-            <!-- Dynamically populated -->
-          </div>
-        </section>
-
-        <!-- Kids Animal Room Selector (Shown in Kids Mode) -->
-        <section id="kids-rooms-section" aria-labelledby="kids-rooms-heading">
-          <div class="section-header-row">
-            <h2 id="kids-rooms-heading" class="section-title">
-              <span>🐾</span>
-              <span>Choose a Fun Room</span>
-            </h2>
-            <span class="section-badge">Play & Draw</span>
-          </div>
-          <div id="kids-animal-selector" class="kids-animal-selector">
-            <!-- Dynamically populated -->
-          </div>
-        </section>
-
-        <!-- Simple Word Code / Custom Room Join -->
+        <!-- Simple Word Code / Room Join -->
         <section class="join-box" aria-labelledby="join-box-heading">
           <h2 id="join-box-heading" class="section-title">
             <span>🔑</span>
-            <span>Or Enter a Friendly Room Code</span>
+            <span>Choose or Enter a Room Word</span>
           </h2>
+
+          <div class="quick-word-tags">
+            <button class="word-tag" type="button" data-code="sunny-cat">🐱 SUNNY-CAT</button>
+            <button class="word-tag" type="button" data-code="golden-garden">🌻 GOLDEN-GARDEN</button>
+            <button class="word-tag" type="button" data-code="happy-house">🏡 HAPPY-HOUSE</button>
+            <button class="word-tag" type="button" data-code="story-time">📚 STORY-TIME</button>
+            <button class="word-tag" type="button" data-code="lion-safari">🦁 LION-ROOM</button>
+            <button class="word-tag" type="button" data-code="rocket-space">🚀 ROCKET-ROOM</button>
+          </div>
 
           <div class="join-grid">
             <div class="input-group">
-              <label for="input-room-code" class="input-label">Room Code (Word or Name):</label>
+              <label for="input-room-code" class="input-label">Room Word:</label>
               <input id="input-room-code" class="big-input" type="text" placeholder="e.g. SUNNY-CAT" autocomplete="off" />
-              <div class="quick-word-tags">
-                <button class="word-tag" type="button" data-code="sunny-cat">🐱 SUNNY-CAT</button>
-                <button class="word-tag" type="button" data-code="golden-garden">🌻 GOLDEN-GARDEN</button>
-                <button class="word-tag" type="button" data-code="happy-house">🏡 HAPPY-HOUSE</button>
-                <button class="word-tag" type="button" data-code="story-time">📚 STORY-TIME</button>
-              </div>
             </div>
 
             <div class="input-group">
@@ -310,6 +285,12 @@
           <button id="btn-toggle-cam" class="giant-btn btn-cam-active" type="button" aria-label="Toggle Camera">
             <span class="btn-icon">📹</span>
             <span class="btn-label">CAMERA ON</span>
+          </button>
+
+          <!-- Giant Screen Share Button -->
+          <button id="btn-toggle-screen" class="giant-btn btn-screen-off" type="button" aria-label="Toggle Screen Sharing">
+            <span class="btn-icon">🖥️</span>
+            <span class="btn-label">SHARE SCREEN</span>
           </button>
 
           <!-- Giant Volume Booster -->

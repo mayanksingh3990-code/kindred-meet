@@ -15,8 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const screenRoom = document.getElementById('screen-room');
 
   // Home Screen Inputs
-  const speedDialGrid = document.getElementById('speed-dial-grid');
-  const animalSelector = document.getElementById('kids-animal-selector');
   const inputRoomCode = document.getElementById('input-room-code');
   const inputUserName = document.getElementById('input-user-name');
   const btnJoinCustom = document.getElementById('btn-join-custom');
@@ -56,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Control Buttons
   const btnToggleMic = document.getElementById('btn-toggle-mic');
   const btnToggleCam = document.getElementById('btn-toggle-cam');
+  const btnToggleScreen = document.getElementById('btn-toggle-screen');
   const btnEndCall = document.getElementById('btn-end-call');
   const btnVolumeBoost = document.getElementById('btn-volume-boost');
   const btnToggleCaptions = document.getElementById('btn-toggle-captions');
@@ -81,41 +80,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let isCaptionsActive = true;
   let isVolumeBoosted = false;
   let isDrawingActive = false;
-  let isStickersActive = false;
   let isSoundboardActive = false;
   let currentSubLang = 'en';
-
-  // Speed Dial Contacts Data
-  const speedDialContacts = [
-    { name: 'Grandma Rose', icon: '👵', room: 'grandma-rose', badge: 'Family Speed Dial' },
-    { name: 'Grandpa Joe', icon: '👴', room: 'grandpa-joe', badge: 'Direct Call' },
-    { name: 'Mom & Dad', icon: '🏡', room: 'mom-dad-home', badge: 'Living Room' },
-    { name: 'Alex & Emma (Kids)', icon: '🧸', room: 'fun-kids-club', badge: 'Kids Club' }
-  ];
-
-  // Kids Animal Rooms Data
-  const animalRooms = [
-    { name: 'Lion Room', icon: '🦁', room: 'lion-safari' },
-    { name: 'Rocket Room', icon: '🚀', room: 'rocket-space' },
-    { name: 'Rainbow Room', icon: '🌈', room: 'rainbow-cloud' },
-    { name: 'Unicorn Room', icon: '🦄', room: 'unicorn-magic' },
-    { name: 'Puppy Room', icon: '🐶', room: 'puppy-park' },
-    { name: 'Dolphin Room', icon: '🐬', room: 'dolphin-sea' }
-  ];
 
   // --- INITIALIZATION ---
   function init() {
     window.deviceNotificationManager.init();
     updateNotificationButtonState();
 
-    renderSpeedDial();
-    renderAnimalRooms();
     populateDeviceSelectors();
     bindEventListeners();
     setupSignalingHandlers();
 
     if (selectSubLang) {
-      currentSubLang = selectSubLang.value || 'es';
+      currentSubLang = selectSubLang.value || 'en';
       window.liveCaptionsManager.setLanguages('en', currentSubLang);
     }
 
@@ -199,48 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
     targetScreen.classList.add('active');
   }
 
-  // Render Speed Dial Cards
-  function renderSpeedDial() {
-    speedDialGrid.innerHTML = '';
-    speedDialContacts.forEach((contact) => {
-      const card = document.createElement('div');
-      card.className = 'speed-card';
-      card.innerHTML = `
-        <div class="card-avatar">${contact.icon}</div>
-        <div class="card-name">${contact.name}</div>
-        <div class="card-badge">🟢 Ready to Call</div>
-        <button class="card-call-action" type="button">
-          <span>📞 CALL NOW</span>
-        </button>
-      `;
-      card.addEventListener('click', () => {
-        if (window.soundEngine) window.soundEngine.playChime();
-        startPrecall(contact.room, contact.name);
-      });
-      speedDialGrid.appendChild(card);
-    });
-  }
-
-  // Render Kids Animal Rooms
-  function renderAnimalRooms() {
-    animalSelector.innerHTML = '';
-    animalRooms.forEach((animal) => {
-      const btn = document.createElement('button');
-      btn.className = 'animal-card-btn';
-      btn.type = 'button';
-      btn.innerHTML = `
-        <span class="animal-icon">${animal.icon}</span>
-        <span class="animal-name">${animal.name}</span>
-      `;
-      btn.addEventListener('click', () => {
-        if (window.soundEngine) window.soundEngine.playSparkle();
-        inputRoomCode.value = animal.room;
-        startPrecall(animal.room, animal.name);
-      });
-      animalSelector.appendChild(btn);
-    });
-  }
-
   // Start Pre-Call Hardware Test
   async function startPrecall(roomId, roomDisplayName) {
     targetRoomId = roomId;
@@ -314,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     updateControlButtons();
+    updateScreenShareButton(false);
     showToast(`🟢 Connected to ${targetRoomName}!`);
   }
 
@@ -447,6 +384,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Update Screen Sharing Button UI
+  function updateScreenShareButton(isSharing) {
+    if (!btnToggleScreen) return;
+    if (isSharing) {
+      btnToggleScreen.className = 'giant-btn btn-screen-active';
+      btnToggleScreen.innerHTML = `
+        <span class="btn-icon">🖥️</span>
+        <span class="btn-label">STOP SHARING</span>
+      `;
+    } else {
+      btnToggleScreen.className = 'giant-btn btn-screen-off';
+      btnToggleScreen.innerHTML = `
+        <span class="btn-icon">🖥️</span>
+        <span class="btn-label">SHARE SCREEN</span>
+      `;
+    }
+  }
+
   // Floating Emoji Reactions & Sounds
   function sendReaction(emoji) {
     if (window.soundEngine) {
@@ -490,6 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function hangUpCallNow() {
     modalHangup.style.display = 'none';
 
+    window.webRTCManager.stopScreenShare();
+    updateScreenShareButton(false);
     window.webRTCManager.leaveCall();
     window.liveCaptionsManager.stopListening();
 
@@ -609,6 +566,23 @@ document.addEventListener('DOMContentLoaded', () => {
       updateControlButtons();
       showToast(isOn ? '📹 Camera is now ON' : '🚫 Camera is now OFF');
     });
+
+    if (btnToggleScreen) {
+      btnToggleScreen.addEventListener('click', async () => {
+        try {
+          const isSharing = await window.webRTCManager.toggleScreenShare((stoppedSharing) => {
+            updateScreenShareButton(false);
+            showToast('🖥️ Screen sharing ended');
+          });
+          updateScreenShareButton(isSharing);
+          showToast(isSharing ? '🖥️ Screen sharing started!' : '🖥️ Screen sharing stopped');
+        } catch (err) {
+          console.error('Screen sharing error:', err);
+          updateScreenShareButton(false);
+          showToast('⚠️ Could not start screen sharing');
+        }
+      });
+    }
 
     btnVolumeBoost.addEventListener('click', () => {
       isVolumeBoosted = !isVolumeBoosted;
