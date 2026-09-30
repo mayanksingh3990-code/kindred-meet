@@ -1,0 +1,23 @@
+{
+  "name": "kindred-meet",
+  "version": "1.0.0",
+  "description": "Ultra-simple, accessible video calling app designed for seniors, grandparents, and kids.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "webrtc",
+    "accessibility",
+    "senior-friendly",
+    "kids-mode",
+    "video-calling",
+    "easy-meet"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

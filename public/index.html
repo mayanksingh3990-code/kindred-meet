@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kindred Meet — Simple, Accessible Video Calling</title>
+  <meta name="description" content="Dead-simple video calling designed for seniors, grandparents, and kids. One-touch speed dial, giant high-contrast controls, device notifications, live captions, and shared drawing." />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="mode-senior">
+  <div id="app">
+    <!-- Top Navigation Bar -->
+    <header class="top-bar">
+      <div class="app-logo">
+        <span class="logo-icon">🌻</span>
+        <div class="logo-text-group">
+          <span class="logo-text">Kindred Meet</span>
+          <span class="logo-badge" id="current-mode-tag">Senior Mode</span>
+        </div>
+      </div>
+
+      <div class="header-right-actions">
+        <!-- AI Subtitles Target Language Selector -->
+        <div class="ai-lang-pill">
+          <span class="lang-icon">🌐</span>
+          <label for="select-sub-lang" class="sr-only">Subtitles Language</label>
+          <select id="select-sub-lang" class="lang-select" title="Choose AI subtitle translation language">
+            <option value="en" selected>English Subtitles</option>
+            <option value="es">Spanish (Español)</option>
+            <option value="hi">Hindi (हिंदी)</option>
+            <option value="fr">French (Français)</option>
+            <option value="de">German (Deutsch)</option>
+            <option value="zh">Chinese (中文)</option>
+            <option value="it">Italian (Italiano)</option>
+            <option value="ja">Japanese (日本語)</option>
+            <option value="ar">Arabic (العربية)</option>
+            <option value="pt">Portuguese (Português)</option>
+          </select>
+        </div>
+
+        <!-- Notification Permission Button -->
+        <button id="btn-enable-notif" class="notif-btn" type="button" title="Enable device alerts for incoming calls and events">
+          <span class="notif-icon">🔔</span>
+          <span class="notif-label">Device Alerts</span>
+        </button>
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle-group" role="group" aria-label="Mode Selector">
+          <button id="mode-senior-btn" class="mode-btn active" type="button" aria-pressed="true">
+            <span>👵</span>
+            <span>Senior Mode</span>
+          </button>
+          <button id="mode-kids-btn" class="mode-btn" type="button" aria-pressed="false">
+            <span>🎈</span>
+            <span>Kids Mode</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Floating Toast Notifications -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- =========================================================
+         SCREEN 1: WELCOME & SPEED-DIAL (HOME)
+         ========================================================= -->
+    <main id="screen-home" class="screen active">
+      <div class="home-container">
+        <!-- Welcome Title -->
+        <div class="welcome-header">
+          <h1 class="welcome-title">Who would you like to call today?</h1>
+          <p class="welcome-subtitle">Tap any family member below to start a call with one touch.</p>
+        </div>
+
+        <!-- 1-Click Speed Dial Contacts -->
+        <section aria-labelledby="speed-dial-heading">
+          <div class="section-header-row">
+            <h2 id="speed-dial-heading" class="section-title">
+              <span>⚡</span>
+              <span>Family Speed Dial</span>
+            </h2>
+            <span class="section-badge">1-Tap Direct Call</span>
+          </div>
+          <div id="speed-dial-grid" class="speed-dial-grid">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- Kids Animal Room Selector (Shown in Kids Mode) -->
+        <section id="kids-rooms-section" aria-labelledby="kids-rooms-heading">
+          <div class="section-header-row">
+            <h2 id="kids-rooms-heading" class="section-title">
+              <span>🐾</span>
+              <span>Choose a Fun Room</span>
+            </h2>
+            <span class="section-badge">Play & Draw</span>
+          </div>
+          <div id="kids-animal-selector" class="kids-animal-selector">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- Simple Word Code / Custom Room Join -->
+        <section class="join-box" aria-labelledby="join-box-heading">
+          <h2 id="join-box-heading" class="section-title">
+            <span>🔑</span>
+            <span>Or Enter a Friendly Room Code</span>
+          </h2>
+
+          <div class="join-grid">
+            <div class="input-group">
+              <label for="input-room-code" class="input-label">Room Code (Word or Name):</label>
+              <input id="input-room-code" class="big-input" type="text" placeholder="e.g. SUNNY-CAT" autocomplete="off" />
+              <div class="quick-word-tags">
+                <button class="word-tag" type="button" data-code="sunny-cat">🐱 SUNNY-CAT</button>
+                <button class="word-tag" type="button" data-code="golden-garden">🌻 GOLDEN-GARDEN</button>
+                <button class="word-tag" type="button" data-code="happy-house">🏡 HAPPY-HOUSE</button>
+                <button class="word-tag" type="button" data-code="story-time">📚 STORY-TIME</button>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label for="input-user-name" class="input-label">Your Name:</label>
+              <input id="input-user-name" class="big-input" type="text" placeholder="e.g. Grandma Rose" />
+            </div>
+          </div>
+
+          <button id="btn-join-custom" class="big-join-btn" type="button">
+            <span>📞</span>
+            <span>START / JOIN CALL</span>
+          </button>
+        </section>
+      </div>
+    </main>
+
+    <!-- =========================================================
+         SCREEN 2: PRE-CALL HARDWARE & SOUND CHECK
+         ========================================================= -->
+    <main id="screen-precall" class="screen">
+      <div class="precall-container">
+        <h1 id="precall-room-label" class="welcome-title">Getting Ready for Your Call</h1>
+        <p class="welcome-subtitle">Let's make sure your camera and microphone are working perfectly.</p>
+
+        <!-- Camera Preview Box -->
+        <div class="precall-preview-box">
+          <video id="preview-video" class="preview-video" autoplay playsinline muted></video>
+          <div class="preview-badge">📹 Camera Preview Working</div>
+        </div>
+
+        <!-- Microphone Voice Level Test Meter -->
+        <div class="meter-card">
+          <div class="meter-header">
+            <span class="meter-title">🎤 Speak to test your microphone:</span>
+            <span id="meter-status-text" class="meter-status">Listening...</span>
+          </div>
+          <div class="meter-bar-track">
+            <div id="meter-fill" class="meter-bar-fill"></div>
+          </div>
+          
+          <div class="hardware-controls-row">
+            <button id="btn-test-speaker" class="test-speaker-btn" type="button">
+              <span>🔔</span>
+              <span>Test Speaker (Play Chime)</span>
+            </button>
+
+            <!-- Device Selector Toggle for Helpers -->
+            <button id="btn-toggle-device-settings" class="test-speaker-btn" type="button">
+              <span>⚙️</span>
+              <span>Change Camera / Mic</span>
+            </button>
+          </div>
+
+          <!-- Collapsible Device Selectors -->
+          <div id="device-selectors-box" class="device-selectors-box" style="display: none;">
+            <div class="device-select-group">
+              <label for="select-camera" class="device-label">Camera:</label>
+              <select id="select-camera" class="device-select"></select>
+            </div>
+            <div class="device-select-group">
+              <label for="select-mic" class="device-label">Microphone:</label>
+              <select id="select-mic" class="device-select"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Invite Link Row -->
+        <div class="share-link-card">
+          <span class="share-link-text" id="share-link-text">Invite Link: http://...</span>
+          <button id="btn-copy-invite-link" class="btn-copy-link" type="button">
+            <span>📋 Copy Link for Family</span>
+          </button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="precall-actions">
+          <button id="btn-precall-back" class="btn-secondary" type="button">
+            <span>⬅️ Go Back</span>
+          </button>
+          <button id="btn-precall-enter" class="big-join-btn" type="button">
+            <span>🟢 ENTER CALL NOW</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- =========================================================
+         SCREEN 3: ACTIVE VIDEO CALL ROOM
+         ========================================================= -->
+    <main id="screen-room" class="screen">
+      <div class="room-container">
+        <!-- Room Header Bar with Quick Info & Invite -->
+        <div class="room-header-bar">
+          <div class="room-title-info">
+            <span class="live-dot"></span>
+            <span id="room-active-title" class="room-active-title">Call: Family Room</span>
+          </div>
+          <div class="room-header-actions">
+            <button id="btn-room-copy-link" class="room-chip-btn" type="button">
+              <span>📋</span>
+              <span>Copy Link</span>
+            </button>
+            <button id="btn-room-ring-alert" class="room-chip-btn ring-btn" type="button">
+              <span>🔔</span>
+              <span>Ring Family</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Kids Activity Bar -->
+        <div id="kids-activity-bar" class="kids-activity-bar">
+          <button id="btn-tool-draw" class="kids-tool-btn" type="button">
+            <span>🎨</span>
+            <span>Draw Together</span>
+          </button>
+          <button id="btn-tool-stickers" class="kids-tool-btn" type="button">
+            <span>🎭</span>
+            <span>Change Funny Hat</span>
+          </button>
+          <button id="btn-tool-soundboard" class="kids-tool-btn" type="button">
+            <span>🎉</span>
+            <span>Soundboard & Emojis</span>
+          </button>
+        </div>
+
+        <!-- Video Stage -->
+        <div id="video-stage" class="video-stage">
+          <!-- Remote Video -->
+          <video id="remote-video" class="remote-video" autoplay playsinline style="display: none;"></video>
+
+          <!-- Remote Waiting Placeholder -->
+          <div id="remote-placeholder" class="remote-placeholder">
+            <div class="spinner-ring"></div>
+            <div class="remote-placeholder-text">Waiting for your family member to join...</div>
+            <div id="remote-room-tag" class="remote-room-tag">Room: Loading</div>
+            <p class="remote-helper-text">Share the room code or link above so they can join instantly from any phone, tablet, or laptop!</p>
+          </div>
+
+          <!-- Local Picture-in-Picture Video -->
+          <div id="local-pip" class="local-pip">
+            <video id="local-pip-video" autoplay playsinline muted></video>
+            <div class="pip-label">You</div>
+          </div>
+
+          <!-- Video Stickers Overlay Layer -->
+          <div id="video-stickers-overlay" class="video-stickers-layer"></div>
+
+          <!-- Shared Drawing Canvas Layer -->
+          <canvas id="drawing-canvas" class="drawing-canvas-layer"></canvas>
+
+          <!-- Giant Live Captions / Subtitles Banner -->
+          <div id="captions-banner" class="captions-banner hidden" aria-live="assertive">
+            <div class="caption-card">
+              <div class="caption-header">
+                <span class="caption-speaker">🗣️ Speaker</span>
+                <span class="caption-ai-tag">✨ AI Live Subtitles</span>
+              </div>
+              <div class="caption-translated">Live subtitles will appear here as people speak.</div>
+            </div>
+          </div>
+
+          <!-- Floating Drawing Toolbar (Shown when drawing) -->
+          <div id="drawing-toolbar" class="drawing-toolbar" style="display: none;">
+            <div class="color-dot" style="background: #FF3B30;" data-color="#FF3B30"></div>
+            <div class="color-dot" style="background: #34C759;" data-color="#34C759"></div>
+            <div class="color-dot" style="background: #007AFF;" data-color="#007AFF"></div>
+            <div class="color-dot" style="background: #FFCC00;" data-color="#FFCC00"></div>
+            <div class="color-dot" style="background: #AF52DE;" data-color="#AF52DE"></div>
+            <button id="btn-clear-canvas" class="canvas-action-btn" type="button">🗑️ Clear</button>
+          </div>
+
+          <!-- Floating Emoji Soundboard Tray -->
+          <div id="emoji-tray" class="emoji-tray" style="display: none;">
+            <button class="emoji-btn" type="button" data-emoji="🎉" title="Party Fanfare">🎉</button>
+            <button class="emoji-btn" type="button" data-emoji="❤️" title="Heart Love">❤️</button>
+            <button class="emoji-btn" type="button" data-emoji="👏" title="Applause">👏</button>
+            <button class="emoji-btn" type="button" data-emoji="🐶" title="Puppy Sound">🐶</button>
+            <button class="emoji-btn" type="button" data-emoji="⭐" title="Sparkle Star">⭐</button>
+          </div>
+        </div>
+
+        <!-- Giant High-Contrast Control Bar -->
+        <footer class="call-controls-bar">
+          <!-- Giant Mic Button -->
+          <button id="btn-toggle-mic" class="giant-btn btn-mic-active" type="button" aria-label="Toggle Microphone">
+            <span class="btn-icon">🎤</span>
+            <span class="btn-label">MIC IS ON</span>
+          </button>
+
+          <!-- Giant Cam Button -->
+          <button id="btn-toggle-cam" class="giant-btn btn-cam-active" type="button" aria-label="Toggle Camera">
+            <span class="btn-icon">📹</span>
+            <span class="btn-label">CAMERA ON</span>
+          </button>
+
+          <!-- Giant Volume Booster -->
+          <button id="btn-volume-boost" class="giant-btn btn-boost-off" type="button" aria-label="Toggle Extra Loud Audio Boost">
+            <span class="btn-icon">🔉</span>
+            <span class="btn-label">NORMAL AUDIO</span>
+          </button>
+
+          <!-- Giant Subtitles Button -->
+          <button id="btn-toggle-captions" class="giant-btn btn-captions" type="button" aria-label="Toggle Live Subtitles">
+            <span class="btn-icon">💬</span>
+            <span class="btn-label">SUBTITLES</span>
+          </button>
+
+          <!-- Giant I Need Help Button -->
+          <button id="btn-help-caregiver" class="giant-btn btn-help-caregiver" type="button" aria-label="Ask for Help">
+            <span class="btn-icon">🙋</span>
+            <span class="btn-label">I NEED HELP</span>
+          </button>
+
+          <!-- Giant Hang Up Button -->
+          <button id="btn-end-call" class="giant-btn btn-end-call" type="button" aria-label="End Call">
+            <span class="btn-icon">📞</span>
+            <span class="btn-label">HANG UP</span>
+          </button>
+        </footer>
+      </div>
+    </main>
+
+    <!-- =========================================================
+         IN-APP HANG UP CONFIRMATION MODAL
+         ========================================================= -->
+    <div id="modal-hangup" class="modal-overlay" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-icon">📞</div>
+        <h2 class="modal-title">End This Call?</h2>
+        <p class="modal-desc">Would you like to hang up and return to the main screen?</p>
+        <div class="modal-actions">
+          <button id="btn-modal-cancel" class="modal-btn btn-keep-talking" type="button">
+            <span>⬅️ Keep Talking</span>
+          </button>
+          <button id="btn-modal-confirm" class="modal-btn btn-confirm-hangup" type="button">
+            <span>📞 Yes, Hang Up</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/notifications.js"></script>
+  <script src="/js/audio-effects.js"></script>
+  <script src="/js/captions.js"></script>
+  <script src="/js/canvas.js"></script>
+  <script src="/js/face-stickers.js"></script>
+  <script src="/js/webrtc.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
