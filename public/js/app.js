@@ -22,7 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Pre-call Elements
   const previewVideo = document.getElementById('preview-video');
+  const precallCamOffOverlay = document.getElementById('precall-cam-off-overlay');
+  const previewBadgeStatus = document.getElementById('preview-badge-status');
+  const btnPrecallToggleMic = document.getElementById('btn-precall-toggle-mic');
+  const btnPrecallToggleCam = document.getElementById('btn-precall-toggle-cam');
   const meterFill = document.getElementById('meter-fill');
+  const meterStatusText = document.getElementById('meter-status-text');
   const btnTestSpeaker = document.getElementById('btn-test-speaker');
   const btnPrecallBack = document.getElementById('btn-precall-back');
   const btnPrecallEnter = document.getElementById('btn-precall-enter');
@@ -50,6 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const videoStickersOverlay = document.getElementById('video-stickers-overlay');
   const emojiTray = document.getElementById('emoji-tray');
   const drawingToolbar = document.getElementById('drawing-toolbar');
+
+  // Screen Share Live Preview Card
+  const screenSharePreviewCard = document.getElementById('screen-share-preview-card');
+  const screenSharePreviewVideo = document.getElementById('screen-share-preview-video');
+  const btnStopScreenPreview = document.getElementById('btn-stop-screen-preview');
 
   // Control Buttons
   const btnToggleMic = document.getElementById('btn-toggle-mic');
@@ -82,6 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let isDrawingActive = false;
   let isSoundboardActive = false;
   let currentSubLang = 'en';
+
+  // Pre-call Hardware Toggle Preferences
+  let precallAudioEnabled = true;
+  let precallVideoEnabled = true;
 
   // --- INITIALIZATION ---
   function init() {
@@ -177,6 +191,45 @@ document.addEventListener('DOMContentLoaded', () => {
     targetScreen.classList.add('active');
   }
 
+  // Update Pre-Call Quick Hardware Toggle Buttons
+  function updatePrecallToggleButtons() {
+    if (btnPrecallToggleMic) {
+      if (precallAudioEnabled) {
+        btnPrecallToggleMic.className = 'precall-toggle-btn btn-mic-active';
+        btnPrecallToggleMic.innerHTML = `
+          <span class="btn-icon">🎤</span>
+          <span class="btn-label">MIC IS ON</span>
+        `;
+      } else {
+        btnPrecallToggleMic.className = 'precall-toggle-btn btn-mic-muted';
+        btnPrecallToggleMic.innerHTML = `
+          <span class="btn-icon">🔇</span>
+          <span class="btn-label">MIC IS OFF</span>
+        `;
+      }
+    }
+
+    if (btnPrecallToggleCam) {
+      if (precallVideoEnabled) {
+        btnPrecallToggleCam.className = 'precall-toggle-btn btn-cam-active';
+        btnPrecallToggleCam.innerHTML = `
+          <span class="btn-icon">📹</span>
+          <span class="btn-label">CAMERA ON</span>
+        `;
+        if (precallCamOffOverlay) precallCamOffOverlay.style.display = 'none';
+        if (previewBadgeStatus) previewBadgeStatus.textContent = '📹 Camera Preview Working';
+      } else {
+        btnPrecallToggleCam.className = 'precall-toggle-btn btn-cam-off';
+        btnPrecallToggleCam.innerHTML = `
+          <span class="btn-icon">🚫</span>
+          <span class="btn-label">CAMERA OFF</span>
+        `;
+        if (precallCamOffOverlay) precallCamOffOverlay.style.display = 'flex';
+        if (previewBadgeStatus) previewBadgeStatus.textContent = '🚫 Camera is Turned Off';
+      }
+    }
+  }
+
   // Start Pre-Call Hardware Test
   async function startPrecall(roomId, roomDisplayName) {
     targetRoomId = roomId;
@@ -185,6 +238,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const inviteUrl = `${window.location.origin}/?room=${encodeURIComponent(targetRoomId)}&mode=${currentMode}`;
     shareLinkText.textContent = `Invite Link: ${inviteUrl}`;
+
+    // Default to enabled on entry
+    precallAudioEnabled = true;
+    precallVideoEnabled = true;
+    updatePrecallToggleButtons();
 
     switchScreen(screenPrecall);
 
@@ -195,6 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (stopMicMeter) stopMicMeter();
       stopMicMeter = window.soundEngine.setupMicMeter(stream, (level) => {
+        if (!precallAudioEnabled) {
+          meterFill.style.width = '0%';
+          return;
+        }
         meterFill.style.width = `${Math.min(100, level * 1.8)}%`;
       });
     }
@@ -214,12 +276,16 @@ document.addEventListener('DOMContentLoaded', () => {
     roomActiveTitle.textContent = `Call: ${targetRoomName}`;
     remoteRoomTag.textContent = `Room: ${targetRoomName}`;
 
+    // Apply pre-call mic and camera choices to active WebRTC stream
+    window.webRTCManager.setAudioEnabled(precallAudioEnabled);
+    window.webRTCManager.setVideoEnabled(precallVideoEnabled);
+
     if (window.webRTCManager.localStream) {
       localPipVideo.srcObject = window.webRTCManager.localStream;
       localPipVideo.play().catch(() => {});
 
       window.soundEngine.setupMicMeter(window.webRTCManager.localStream, (level) => {
-        if (level > 15) {
+        if (level > 15 && !window.webRTCManager.isMuted) {
           localPip.classList.add('speaking-glow');
         } else {
           localPip.classList.remove('speaking-glow');
@@ -345,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnToggleMic.className = 'giant-btn btn-mic-muted';
       btnToggleMic.innerHTML = `
         <span class="btn-icon">🔇</span>
-        <span class="btn-label">MIC MUTED (Tap to talk)</span>
+        <span class="btn-label">MIC MUTED</span>
       `;
     } else {
       btnToggleMic.className = 'giant-btn btn-mic-active';
@@ -373,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnVolumeBoost.className = 'giant-btn btn-boost-active';
       btnVolumeBoost.innerHTML = `
         <span class="btn-icon">🔊</span>
-        <span class="btn-label">EXTRA LOUD: ON</span>
+        <span class="btn-label">EXTRA LOUD</span>
       `;
     } else {
       btnVolumeBoost.className = 'giant-btn btn-boost-off';
@@ -384,21 +450,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Update Screen Sharing Button UI
+  // Update Screen Sharing Button & Live Preview UI
   function updateScreenShareButton(isSharing) {
-    if (!btnToggleScreen) return;
-    if (isSharing) {
-      btnToggleScreen.className = 'giant-btn btn-screen-active';
-      btnToggleScreen.innerHTML = `
-        <span class="btn-icon">🖥️</span>
-        <span class="btn-label">STOP SHARING</span>
-      `;
-    } else {
-      btnToggleScreen.className = 'giant-btn btn-screen-off';
-      btnToggleScreen.innerHTML = `
-        <span class="btn-icon">🖥️</span>
-        <span class="btn-label">SHARE SCREEN</span>
-      `;
+    if (btnToggleScreen) {
+      if (isSharing) {
+        btnToggleScreen.className = 'giant-btn btn-screen-active';
+        btnToggleScreen.innerHTML = `
+          <span class="btn-icon">🖥️</span>
+          <span class="btn-label">STOP SHARING</span>
+        `;
+      } else {
+        btnToggleScreen.className = 'giant-btn btn-screen-off';
+        btnToggleScreen.innerHTML = `
+          <span class="btn-icon">🖥️</span>
+          <span class="btn-label">SHARE SCREEN</span>
+        `;
+      }
+    }
+
+    // Toggle the floating live screen share preview card
+    if (screenSharePreviewCard && screenSharePreviewVideo) {
+      if (isSharing && window.webRTCManager.screenStream) {
+        screenSharePreviewVideo.srcObject = window.webRTCManager.screenStream;
+        screenSharePreviewVideo.play().catch(() => {});
+        screenSharePreviewCard.style.display = 'flex';
+      } else {
+        screenSharePreviewVideo.srcObject = null;
+        screenSharePreviewCard.style.display = 'none';
+      }
     }
   }
 
@@ -535,6 +614,38 @@ document.addEventListener('DOMContentLoaded', () => {
       startPrecall(code, `Room: ${code.toUpperCase()}`);
     });
 
+    // Pre-call Quick Mic & Camera Toggles
+    if (btnPrecallToggleMic) {
+      btnPrecallToggleMic.addEventListener('click', () => {
+        precallAudioEnabled = !precallAudioEnabled;
+        if (previewVideo && previewVideo.srcObject) {
+          const audioTrack = previewVideo.srcObject.getAudioTracks()[0];
+          if (audioTrack) audioTrack.enabled = precallAudioEnabled;
+        }
+        if (meterStatusText) {
+          meterStatusText.textContent = precallAudioEnabled ? 'Listening...' : 'Microphone Muted';
+          meterStatusText.style.color = precallAudioEnabled ? 'var(--btn-green)' : 'var(--btn-red)';
+        }
+        if (!precallAudioEnabled && meterFill) {
+          meterFill.style.width = '0%';
+        }
+        updatePrecallToggleButtons();
+        showToast(precallAudioEnabled ? '🎤 Microphone is ON' : '🔇 Microphone is OFF');
+      });
+    }
+
+    if (btnPrecallToggleCam) {
+      btnPrecallToggleCam.addEventListener('click', () => {
+        precallVideoEnabled = !precallVideoEnabled;
+        if (previewVideo && previewVideo.srcObject) {
+          const videoTrack = previewVideo.srcObject.getVideoTracks()[0];
+          if (videoTrack) videoTrack.enabled = precallVideoEnabled;
+        }
+        updatePrecallToggleButtons();
+        showToast(precallVideoEnabled ? '📹 Camera is ON' : '🚫 Camera is OFF');
+      });
+    }
+
     btnTestSpeaker.addEventListener('click', () => {
       if (window.soundEngine) {
         window.soundEngine.playChime();
@@ -567,6 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast(isOn ? '📹 Camera is now ON' : '🚫 Camera is now OFF');
     });
 
+    // In-Call Screen Share Toggle
     if (btnToggleScreen) {
       btnToggleScreen.addEventListener('click', async () => {
         try {
@@ -581,6 +693,15 @@ document.addEventListener('DOMContentLoaded', () => {
           updateScreenShareButton(false);
           showToast('⚠️ Could not start screen sharing');
         }
+      });
+    }
+
+    // Stop Screen Share button on the live preview floating card
+    if (btnStopScreenPreview) {
+      btnStopScreenPreview.addEventListener('click', async () => {
+        await window.webRTCManager.stopScreenShare();
+        updateScreenShareButton(false);
+        showToast('🖥️ Screen sharing stopped');
       });
     }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Kindred Meet — Simple, Accessible Video Calling</title>
   <meta name="description" content="Dead-simple video calling designed for seniors, grandparents, and kids. Room word codes, screen sharing, giant high-contrast controls, live captions, and shared drawing." />
   <link rel="stylesheet" href="/css/style.css" />
@@ -114,12 +114,28 @@
     <main id="screen-precall" class="screen">
       <div class="precall-container">
         <h1 id="precall-room-label" class="welcome-title">Getting Ready for Your Call</h1>
-        <p class="welcome-subtitle">Let's make sure your camera and microphone are working perfectly.</p>
+        <p class="welcome-subtitle">Check your camera & mic settings before joining.</p>
 
         <!-- Camera Preview Box -->
         <div class="precall-preview-box">
           <video id="preview-video" class="preview-video" autoplay playsinline muted></video>
-          <div class="preview-badge">📹 Camera Preview Working</div>
+          <div id="precall-cam-off-overlay" class="precall-cam-off-overlay" style="display: none;">
+            <span class="cam-off-icon">🚫</span>
+            <span class="cam-off-text">Camera is Turned Off</span>
+          </div>
+          <div class="preview-badge" id="preview-badge-status">📹 Camera Preview Working</div>
+        </div>
+
+        <!-- Pre-Call Mic & Camera Toggle Row -->
+        <div class="precall-quick-toggles" role="group" aria-label="Microphone and Camera pre-join settings">
+          <button id="btn-precall-toggle-mic" class="precall-toggle-btn btn-mic-active" type="button" aria-label="Toggle Microphone before joining">
+            <span class="btn-icon">🎤</span>
+            <span class="btn-label">MIC IS ON</span>
+          </button>
+          <button id="btn-precall-toggle-cam" class="precall-toggle-btn btn-cam-active" type="button" aria-label="Toggle Camera before joining">
+            <span class="btn-icon">📹</span>
+            <span class="btn-label">CAMERA ON</span>
+          </button>
         </div>
 
         <!-- Microphone Voice Level Test Meter -->
@@ -192,11 +208,11 @@
           <div class="room-header-actions">
             <button id="btn-room-copy-link" class="room-chip-btn" type="button">
               <span>📋</span>
-              <span>Copy Link</span>
+              <span class="chip-label">Copy Link</span>
             </button>
             <button id="btn-room-ring-alert" class="room-chip-btn ring-btn" type="button">
               <span>🔔</span>
-              <span>Ring Family</span>
+              <span class="chip-label">Ring Family</span>
             </button>
           </div>
         </div>
@@ -219,7 +235,7 @@
 
         <!-- Video Stage -->
         <div id="video-stage" class="video-stage">
-          <!-- Remote Video -->
+          <!-- Remote Video (Contains remote user camera OR remote screen share) -->
           <video id="remote-video" class="remote-video" autoplay playsinline style="display: none;"></video>
 
           <!-- Remote Waiting Placeholder -->
@@ -234,6 +250,22 @@
           <div id="local-pip" class="local-pip">
             <video id="local-pip-video" autoplay playsinline muted></video>
             <div class="pip-label">You</div>
+          </div>
+
+          <!-- Floating Local Screen Share Live Preview Card -->
+          <div id="screen-share-preview-card" class="screen-share-preview-card" style="display: none;">
+            <div class="screen-share-preview-header">
+              <span class="screen-share-status">
+                <span class="screen-pulse-dot"></span>
+                <span>You are sharing your screen</span>
+              </span>
+              <button id="btn-stop-screen-preview" class="btn-stop-screen-preview" type="button" title="Stop sharing your screen">
+                <span>🛑 Stop</span>
+              </button>
+            </div>
+            <div class="screen-share-thumb-wrap">
+              <video id="screen-share-preview-video" autoplay playsinline muted></video>
+            </div>
           </div>
 
           <!-- Video Stickers Overlay Layer -->

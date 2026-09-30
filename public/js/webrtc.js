@@ -330,6 +330,28 @@ class WebRTCManager {
     }
   }
 
+  setAudioEnabled(enabled) {
+    if (!this.localStream) return false;
+    const audioTrack = this.localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !!enabled;
+      this.isMuted = !audioTrack.enabled;
+      return !this.isMuted; // true = audio on
+    }
+    return false;
+  }
+
+  setVideoEnabled(enabled) {
+    if (!this.localStream) return false;
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !!enabled;
+      this.isVideoOff = !videoTrack.enabled;
+      return !this.isVideoOff; // true = video on
+    }
+    return false;
+  }
+
   toggleAudio() {
     if (!this.localStream) return false;
     const audioTrack = this.localStream.getAudioTracks()[0];
