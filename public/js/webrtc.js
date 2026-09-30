@@ -1,8 +1,10 @@
-// KINDRED MEET - WebRTC & Peer Connection Manager
+// KINDRED MEET - WebRTC & Peer Connection Manager (Multi-Party & Screen Sharing Support)
 
 class WebRTCManager {
   constructor() {
     this.localStream = null;
+    this.screenStream = null;
+    this.isScreenSharing = false;
     this.peerConnections = new Map(); // targetUserId -> RTCPeerConnection
     this.dataChannels = new Map(); // targetUserId -> RTCDataChannel
     this.ws = null;
@@ -50,7 +52,6 @@ class WebRTCManager {
       return { stream: this.localStream, error: null };
     } catch (err) {
       console.warn('getUserMedia failed, trying audio-only or canvas fallback:', err);
-      // Fallback: try audio only or video only
       try {
         this.localStream = await navigator.mediaDevices.getUserMedia({
           video: false,
@@ -58,7 +59,6 @@ class WebRTCManager {
         });
         return { stream: this.localStream, error: 'Camera not found, audio only' };
       } catch (audioErr) {
-        // Create a blank dummy stream so UI doesn't crash on devices with no webcam/mic
         const canvas = document.createElement('canvas');
         canvas.width = 640;
         canvas.height = 480;
@@ -134,7 +134,7 @@ class WebRTCManager {
 
     switch (type) {
       case 'joined-room': {
-        // Existing peers in the room: initiate call to each
+        // Multi-Party: Connect to all existing peers in the room
         if (peers && peers.length > 0) {
           for (const peer of peers) {
             await this.createPeerConnection(peer.userId, peer.userName, true);
@@ -148,6 +148,14 @@ class WebRTCManager {
         await this.createPeerConnection(userId, userName, false);
         if (window.soundEngine) {
           window.soundEngine.playChime();
+        }
+        // If we are currently sharing our screen, notify the newly joined peer!
+        if (this.isScreenSharing) {
+          this.broadcastData('screen-share-state', {
+            userId: this.userId,
+            userName: this.userName,
+            isSharing: true
+          });
         }
         break;
       }
@@ -199,6 +207,7 @@ class WebRTCManager {
       case 'reaction':
       case 'live-caption':
       case 'helper-alert':
+      case 'screen-share-state':
       case 'remote-mode-change': {
         if (this.onDataMessage) {
           this.onDataMessage({ type, fromUserId, fromUserName, payload });
@@ -222,11 +231,17 @@ class WebRTCManager {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     this.peerConnections.set(targetUserId, pc);
 
-    // Add local tracks
-    if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, this.localStream);
-      });
+    // Determine active video track (screen share track if currently sharing, else webcam)
+    const activeVideoTrack = (this.isScreenSharing && this.screenStream)
+      ? this.screenStream.getVideoTracks()[0]
+      : (this.localStream ? this.localStream.getVideoTracks()[0] : null);
+    const activeAudioTrack = this.localStream ? this.localStream.getAudioTracks()[0] : null;
+
+    if (activeVideoTrack) {
+      pc.addTrack(activeVideoTrack, this.isScreenSharing ? this.screenStream : this.localStream);
+    }
+    if (activeAudioTrack) {
+      pc.addTrack(activeAudioTrack, this.localStream);
     }
 
     // ICE Candidate handler
@@ -240,7 +255,7 @@ class WebRTCManager {
       }
     };
 
-    // Remote Track Handler
+    // Remote Track Handler for Multi-Party Video
     pc.ontrack = (event) => {
       const remoteStream = event.streams[0] || new MediaStream([event.track]);
       if (this.onRemoteStreamAdded) {
@@ -318,7 +333,7 @@ class WebRTCManager {
       }
     });
 
-    // Fallback: broadcast via WebSocket server so everything is 100% reliable
+    // Broadcast via WebSocket server for 100% reliable room-wide delivery
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(jsonStr);
     }
@@ -390,19 +405,40 @@ class WebRTCManager {
   async startScreenShare(onNativeEnded) {
     try {
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' },
+        video: {
+          cursor: 'always'
+        },
         audio: false
       });
 
       const screenTrack = this.screenStream.getVideoTracks()[0];
+      if (!screenTrack) {
+        throw new Error('No screen video track obtained');
+      }
+
+      this.isScreenSharing = true;
 
       // Replace video track in all active peer connections
-      this.peerConnections.forEach((pc) => {
-        const senders = pc.getSenders();
-        const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
-        if (videoSender) {
-          videoSender.replaceTrack(screenTrack);
+      for (const [targetUserId, pc] of this.peerConnections) {
+        try {
+          const senders = pc.getSenders();
+          const videoSender = senders.find((s) => s.track && s.track.kind === 'video') ||
+                              senders.find((s) => s.kind === 'video');
+          if (videoSender) {
+            await videoSender.replaceTrack(screenTrack);
+          } else {
+            pc.addTrack(screenTrack, this.screenStream);
+          }
+        } catch (e) {
+          console.warn(`Could not replace track for peer ${targetUserId}:`, e);
         }
+      }
+
+      // Broadcast screen share state to all peers
+      this.broadcastData('screen-share-state', {
+        userId: this.userId,
+        userName: this.userName,
+        isSharing: true
       });
 
       screenTrack.onended = () => {
@@ -410,7 +446,6 @@ class WebRTCManager {
         if (onNativeEnded) onNativeEnded();
       };
 
-      this.isScreenSharing = true;
       return this.screenStream;
     } catch (err) {
       console.warn('Screen share cancelled or failed:', err);
@@ -420,25 +455,37 @@ class WebRTCManager {
   }
 
   async stopScreenShare() {
+    if (!this.isScreenSharing && !this.screenStream) return;
+
     if (this.screenStream) {
       this.screenStream.getTracks().forEach((t) => t.stop());
       this.screenStream = null;
     }
     this.isScreenSharing = false;
 
-    // Restore camera video track to peers
+    // Restore camera video track to all peers
     if (this.localStream) {
       const camTrack = this.localStream.getVideoTracks()[0];
-      if (camTrack) {
-        this.peerConnections.forEach((pc) => {
+      for (const [targetUserId, pc] of this.peerConnections) {
+        try {
           const senders = pc.getSenders();
-          const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
-          if (videoSender) {
-            videoSender.replaceTrack(camTrack);
+          const videoSender = senders.find((s) => s.track && s.track.kind === 'video') ||
+                              senders.find((s) => s.kind === 'video');
+          if (videoSender && camTrack) {
+            await videoSender.replaceTrack(camTrack);
           }
-        });
+        } catch (e) {
+          console.warn(`Could not restore camera track for peer ${targetUserId}:`, e);
+        }
       }
     }
+
+    // Broadcast screen share state ended
+    this.broadcastData('screen-share-state', {
+      userId: this.userId,
+      userName: this.userName,
+      isSharing: false
+    });
   }
 
   closePeer(targetUserId) {
@@ -451,6 +498,10 @@ class WebRTCManager {
   }
 
   leaveCall() {
+    if (this.isScreenSharing) {
+      this.stopScreenShare();
+    }
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({
         type: 'leave',

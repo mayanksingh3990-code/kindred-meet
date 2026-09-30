@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Kindred Meet — Simple, Accessible Video Calling</title>
-  <meta name="description" content="Dead-simple video calling designed for seniors, grandparents, and kids. Room word codes, screen sharing, giant high-contrast controls, live captions, and shared drawing." />
+  <meta name="description" content="Dead-simple video calling designed for seniors, grandparents, and kids. Room word codes, multi-person grid, screen sharing, giant high-contrast controls, live captions, and shared drawing." />
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body class="mode-senior">
@@ -199,13 +199,18 @@
          ========================================================= -->
     <main id="screen-room" class="screen">
       <div class="room-container">
-        <!-- Room Header Bar with Quick Info & Invite -->
+        <!-- Room Header Bar with Quick Info & Layout & Invite -->
         <div class="room-header-bar">
           <div class="room-title-info">
             <span class="live-dot"></span>
             <span id="room-active-title" class="room-active-title">Call: Family Room</span>
+            <span id="participant-count-badge" class="participant-count-badge">👥 1 In Room</span>
           </div>
           <div class="room-header-actions">
+            <button id="btn-toggle-layout" class="room-chip-btn layout-toggle-btn" type="button" title="Switch layout view">
+              <span id="layout-icon">🔲</span>
+              <span id="layout-label" class="chip-label">Grid View</span>
+            </button>
             <button id="btn-room-copy-link" class="room-chip-btn" type="button">
               <span>📋</span>
               <span class="chip-label">Copy Link</span>
@@ -233,17 +238,34 @@
           </button>
         </div>
 
-        <!-- Video Stage -->
+        <!-- Video Stage (Supports Multi-Party Grid, Spotlight Mode, and Screen Sharing) -->
         <div id="video-stage" class="video-stage">
-          <!-- Remote Video (Contains remote user camera OR remote screen share) -->
-          <video id="remote-video" class="remote-video" autoplay playsinline style="display: none;"></video>
-
-          <!-- Remote Waiting Placeholder -->
+          <!-- Remote Waiting Placeholder (Shown when alone in room) -->
           <div id="remote-placeholder" class="remote-placeholder">
             <div class="spinner-ring"></div>
-            <div class="remote-placeholder-text">Waiting for your family member to join...</div>
+            <div class="remote-placeholder-text">Waiting for others to join...</div>
             <div id="remote-room-tag" class="remote-room-tag">Room: Loading</div>
-            <p class="remote-helper-text">Share the room code or link above so they can join instantly from any phone, tablet, or laptop!</p>
+            <p class="remote-helper-text">Share the room code or link above so anyone can join from any phone, tablet, or laptop!</p>
+          </div>
+
+          <!-- Multi-Party Dynamic Video Grid (2, 3, 4, 5+ Participants) -->
+          <div id="multi-video-grid" class="multi-video-grid" style="display: none;"></div>
+
+          <!-- Dedicated Spotlight / Presentation View Container -->
+          <div id="spotlight-view-container" class="spotlight-view-container" style="display: none;">
+            <div class="spotlight-top-badge">
+              <div class="spotlight-title-group">
+                <span class="spotlight-dot"></span>
+                <span id="spotlight-badge-title">🖥️ Shared Screen</span>
+              </div>
+              <button id="btn-exit-spotlight" class="btn-exit-spotlight" type="button">
+                <span>🔲 Switch to Grid</span>
+              </button>
+            </div>
+            <div class="spotlight-stage-wrapper">
+              <video id="spotlight-video" autoplay playsinline></video>
+            </div>
+            <div id="spotlight-filmstrip" class="spotlight-filmstrip"></div>
           </div>
 
           <!-- Local Picture-in-Picture Video -->
@@ -257,7 +279,7 @@
             <div class="screen-share-preview-header">
               <span class="screen-share-status">
                 <span class="screen-pulse-dot"></span>
-                <span>You are sharing your screen</span>
+                <span>Broadcasting Screen</span>
               </span>
               <button id="btn-stop-screen-preview" class="btn-stop-screen-preview" type="button" title="Stop sharing your screen">
                 <span>🛑 Stop</span>

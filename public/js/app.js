@@ -1,4 +1,4 @@
-// KINDRED MEET - Main Application Controller
+// KINDRED MEET - Main Application Controller (Multi-Party & Screen Sharing Enabled)
 
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
@@ -41,27 +41,40 @@ document.addEventListener('DOMContentLoaded', () => {
   const selectCamera = document.getElementById('select-camera');
   const selectMic = document.getElementById('select-mic');
 
-  // Room Elements
+  // Room Header & Layout Elements
   const roomActiveTitle = document.getElementById('room-active-title');
+  const participantCountBadge = document.getElementById('participant-count-badge');
+  const btnToggleLayout = document.getElementById('btn-toggle-layout');
+  const layoutIcon = document.getElementById('layout-icon');
+  const layoutLabel = document.getElementById('layout-label');
   const btnRoomCopyLink = document.getElementById('btn-room-copy-link');
   const btnRoomRingAlert = document.getElementById('btn-room-ring-alert');
-  const remoteVideo = document.getElementById('remote-video');
+
+  // Video Stage & Multi-Party Elements
   const remotePlaceholder = document.getElementById('remote-placeholder');
   const remoteRoomTag = document.getElementById('remote-room-tag');
+  const multiVideoGrid = document.getElementById('multi-video-grid');
+  const spotlightViewContainer = document.getElementById('spotlight-view-container');
+  const spotlightBadgeTitle = document.getElementById('spotlight-badge-title');
+  const spotlightVideo = document.getElementById('spotlight-video');
+  const spotlightFilmstrip = document.getElementById('spotlight-filmstrip');
+  const btnExitSpotlight = document.getElementById('btn-exit-spotlight');
+
+  // Local Self PIP & Screen Preview
   const localPip = document.getElementById('local-pip');
   const localPipVideo = document.getElementById('local-pip-video');
+  const screenSharePreviewCard = document.getElementById('screen-share-preview-card');
+  const screenSharePreviewVideo = document.getElementById('screen-share-preview-video');
+  const btnStopScreenPreview = document.getElementById('btn-stop-screen-preview');
+
+  // Interactive Overlays
   const captionsBanner = document.getElementById('captions-banner');
   const drawingCanvas = document.getElementById('drawing-canvas');
   const videoStickersOverlay = document.getElementById('video-stickers-overlay');
   const emojiTray = document.getElementById('emoji-tray');
   const drawingToolbar = document.getElementById('drawing-toolbar');
 
-  // Screen Share Live Preview Card
-  const screenSharePreviewCard = document.getElementById('screen-share-preview-card');
-  const screenSharePreviewVideo = document.getElementById('screen-share-preview-video');
-  const btnStopScreenPreview = document.getElementById('btn-stop-screen-preview');
-
-  // Control Buttons
+  // In-Call Control Buttons
   const btnToggleMic = document.getElementById('btn-toggle-mic');
   const btnToggleCam = document.getElementById('btn-toggle-cam');
   const btnToggleScreen = document.getElementById('btn-toggle-screen');
@@ -92,6 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let isDrawingActive = false;
   let isSoundboardActive = false;
   let currentSubLang = 'en';
+
+  // Multi-Party & Layout State
+  const remotePeers = new Map(); // userId -> { userId, userName, stream, isScreenSharing, isSpeaking }
+  let currentViewMode = 'grid'; // 'grid' | 'spotlight'
+  let spotlightTargetUserId = null;
 
   // Pre-call Hardware Toggle Preferences
   let precallAudioEnabled = true;
@@ -239,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inviteUrl = `${window.location.origin}/?room=${encodeURIComponent(targetRoomId)}&mode=${currentMode}`;
     shareLinkText.textContent = `Invite Link: ${inviteUrl}`;
 
-    // Default to enabled on entry
     precallAudioEnabled = true;
     precallVideoEnabled = true;
     updatePrecallToggleButtons();
@@ -276,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
     roomActiveTitle.textContent = `Call: ${targetRoomName}`;
     remoteRoomTag.textContent = `Room: ${targetRoomName}`;
 
-    // Apply pre-call mic and camera choices to active WebRTC stream
+    // Apply pre-call mic and camera choices
     window.webRTCManager.setAudioEnabled(precallAudioEnabled);
     window.webRTCManager.setVideoEnabled(precallVideoEnabled);
 
@@ -315,49 +332,231 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     });
 
+    renderVideoStage();
     updateControlButtons();
     updateScreenShareButton(false);
     showToast(`🟢 Connected to ${targetRoomName}!`);
   }
 
+  // Multi-Party & Screen Sharing Dynamic Video Stage Renderer
+  function renderVideoStage() {
+    const totalParticipants = remotePeers.size + 1;
+    if (participantCountBadge) {
+      participantCountBadge.textContent = totalParticipants === 1 ? '👤 1 in call' : `👥 ${totalParticipants} in call`;
+    }
+
+    // If zero remote participants: show friendly waiting placeholder
+    if (remotePeers.size === 0) {
+      remotePlaceholder.style.display = 'flex';
+      multiVideoGrid.style.display = 'none';
+      spotlightViewContainer.style.display = 'none';
+      localPip.style.display = 'block';
+      return;
+    }
+
+    remotePlaceholder.style.display = 'none';
+
+    // Check if any peer is sharing screen OR if user selected spotlight mode
+    let spotlightPeer = null;
+    for (const [userId, peer] of remotePeers) {
+      if (peer.isScreenSharing) {
+        spotlightPeer = peer;
+        break;
+      }
+    }
+    if (!spotlightPeer && spotlightTargetUserId && remotePeers.has(spotlightTargetUserId)) {
+      spotlightPeer = remotePeers.get(spotlightTargetUserId);
+    }
+    if (!spotlightPeer && currentViewMode === 'spotlight' && remotePeers.size > 0) {
+      spotlightPeer = remotePeers.values().next().value;
+    }
+
+    if (spotlightPeer) {
+      // --- SPOTLIGHT / PRESENTATION MODE ---
+      multiVideoGrid.style.display = 'none';
+      spotlightViewContainer.style.display = 'flex';
+      localPip.style.display = 'block';
+
+      spotlightBadgeTitle.textContent = spotlightPeer.isScreenSharing
+        ? `🖥️ ${spotlightPeer.userName}'s Shared Screen`
+        : `⭐ ${spotlightPeer.userName} (Spotlight)`;
+
+      if (spotlightVideo.srcObject !== spotlightPeer.stream) {
+        spotlightVideo.srcObject = spotlightPeer.stream;
+        spotlightVideo.play().catch(() => {});
+      }
+
+      // Render filmstrip of other participants
+      spotlightFilmstrip.innerHTML = '';
+      remotePeers.forEach((peer) => {
+        if (peer.userId === spotlightPeer.userId) return;
+        const thumb = document.createElement('div');
+        thumb.className = 'filmstrip-thumb';
+        thumb.title = `Spotlight ${peer.userName}`;
+        thumb.innerHTML = `
+          <video autoplay playsinline muted></video>
+          <div class="thumb-badge">${peer.userName}</div>
+        `;
+        const v = thumb.querySelector('video');
+        v.srcObject = peer.stream;
+        v.play().catch(() => {});
+        thumb.addEventListener('click', () => {
+          spotlightTargetUserId = peer.userId;
+          renderVideoStage();
+        });
+        spotlightFilmstrip.appendChild(thumb);
+      });
+      return;
+    }
+
+    // --- MULTI-PARTY GALLERY GRID MODE ---
+    spotlightViewContainer.style.display = 'none';
+    multiVideoGrid.style.display = 'grid';
+    localPip.style.display = 'block';
+
+    const count = remotePeers.size;
+    multiVideoGrid.className = `multi-video-grid grid-count-${count > 4 ? 'many' : count}`;
+
+    // Synchronize DOM tiles with remotePeers Map
+    const existingTileIds = new Set();
+    document.querySelectorAll('.video-tile').forEach((tile) => {
+      const uid = tile.getAttribute('data-user-id');
+      if (!remotePeers.has(uid)) {
+        tile.remove();
+      } else {
+        existingTileIds.add(uid);
+      }
+    });
+
+    remotePeers.forEach((peer, userId) => {
+      let tile = document.getElementById(`tile-${userId}`);
+      if (!tile) {
+        tile = document.createElement('div');
+        tile.className = 'video-tile';
+        tile.id = `tile-${userId}`;
+        tile.setAttribute('data-user-id', userId);
+
+        tile.innerHTML = `
+          <video autoplay playsinline class="tile-video"></video>
+          <div class="tile-badge">
+            <span class="badge-status-dot"></span>
+            <span class="badge-name">${peer.userName}</span>
+            <span class="tile-screen-tag" style="display: none;">🖥️ SCREEN</span>
+          </div>
+          <button class="tile-pin-btn" type="button" title="Spotlight / Enlarge">⭐</button>
+        `;
+
+        const tileVideo = tile.querySelector('video');
+        tileVideo.srcObject = peer.stream;
+        tileVideo.play().catch(() => {});
+
+        const pinBtn = tile.querySelector('.tile-pin-btn');
+        pinBtn.addEventListener('click', () => {
+          spotlightTargetUserId = peer.userId;
+          currentViewMode = 'spotlight';
+          renderVideoStage();
+          showToast(`⭐ Spotlight on ${peer.userName}`);
+        });
+
+        multiVideoGrid.appendChild(tile);
+      } else {
+        const v = tile.querySelector('video');
+        if (v && v.srcObject !== peer.stream) {
+          v.srcObject = peer.stream;
+          v.play().catch(() => {});
+        }
+        const nameEl = tile.querySelector('.badge-name');
+        if (nameEl) nameEl.textContent = peer.userName;
+
+        const screenTag = tile.querySelector('.tile-screen-tag');
+        if (screenTag) screenTag.style.display = peer.isScreenSharing ? 'inline-flex' : 'none';
+      }
+    });
+  }
+
   // Setup Signaling Handlers
   function setupSignalingHandlers() {
     window.webRTCManager.onRemoteStreamAdded = (userId, userName, remoteStream) => {
-      remotePlaceholder.style.display = 'none';
-      remoteVideo.style.display = 'block';
-      remoteVideo.srcObject = remoteStream;
-      remoteVideo.play().catch(() => {});
+      remotePeers.set(userId, {
+        userId,
+        userName: userName || 'Family Member',
+        stream: remoteStream,
+        isScreenSharing: false,
+        isSpeaking: false
+      });
+
+      renderVideoStage();
 
       if (window.soundEngine) {
         window.soundEngine.playChime();
         if (isVolumeBoosted) {
-          window.soundEngine.setVolumeBoost(remoteVideo, true);
+          // Boost stream volume if requested
+          const audioTrack = remoteStream.getAudioTracks()[0];
+          if (audioTrack) {
+            const tempAudio = document.createElement('audio');
+            tempAudio.srcObject = remoteStream;
+            window.soundEngine.setVolumeBoost(tempAudio, true);
+          }
         }
       }
 
+      // Voice level active speaker meter for remote peer
+      window.soundEngine.setupMicMeter(remoteStream, (level) => {
+        const tile = document.getElementById(`tile-${userId}`);
+        if (tile) {
+          if (level > 15) {
+            tile.classList.add('speaking-active');
+          } else {
+            tile.classList.remove('speaking-active');
+          }
+        }
+      });
+
       window.deviceNotificationManager.sendDeviceNotification(
         'Family Connected',
-        `👋 ${userName} joined your video call!`,
+        `👋 ${userName || 'A new participant'} joined the call!`,
         '👋'
       );
     };
 
     window.webRTCManager.onRemoteStreamRemoved = (userId, userName) => {
-      remoteVideo.style.display = 'none';
-      remoteVideo.srcObject = null;
-      remotePlaceholder.style.display = 'flex';
+      remotePeers.delete(userId);
+      if (spotlightTargetUserId === userId) {
+        spotlightTargetUserId = null;
+      }
+      renderVideoStage();
 
       window.deviceNotificationManager.sendDeviceNotification(
         'Call Update',
-        `👋 ${userName || 'Family member'} has left the call.`,
+        `👋 ${userName || 'Participant'} has left the call.`,
         '👋'
       );
     };
 
     window.webRTCManager.onDataMessage = (data) => {
-      const { type, fromUserName, payload } = data;
+      const { type, fromUserId, fromUserName, payload } = data;
 
       switch (type) {
+        case 'screen-share-state': {
+          const peer = remotePeers.get(fromUserId);
+          if (peer) {
+            peer.isScreenSharing = !!payload.isSharing;
+          }
+          if (payload.isSharing) {
+            spotlightTargetUserId = fromUserId;
+            currentViewMode = 'spotlight';
+            showToast(`🖥️ ${fromUserName || 'Presenter'} started sharing screen`);
+          } else {
+            if (spotlightTargetUserId === fromUserId) {
+              spotlightTargetUserId = null;
+              currentViewMode = 'grid';
+            }
+            showToast(`🖥️ ${fromUserName || 'Presenter'} stopped sharing screen`);
+          }
+          renderVideoStage();
+          break;
+        }
+
         case 'draw-stroke':
           window.sharedCanvasManager.handleRemoteStroke(payload);
           break;
@@ -529,21 +728,17 @@ document.addEventListener('DOMContentLoaded', () => {
     window.webRTCManager.leaveCall();
     window.liveCaptionsManager.stopListening();
 
+    remotePeers.clear();
+    spotlightTargetUserId = null;
+    currentViewMode = 'grid';
+
     if (stopMicMeter) stopMicMeter();
 
-    if (remoteVideo) {
-      remoteVideo.srcObject = null;
-      remoteVideo.style.display = 'none';
-    }
-    if (remotePlaceholder) {
-      remotePlaceholder.style.display = 'flex';
-    }
-    if (localPipVideo) {
-      localPipVideo.srcObject = null;
-    }
-    if (previewVideo) {
-      previewVideo.srcObject = null;
-    }
+    if (multiVideoGrid) multiVideoGrid.innerHTML = '';
+    if (spotlightVideo) spotlightVideo.srcObject = null;
+    if (spotlightFilmstrip) spotlightFilmstrip.innerHTML = '';
+    if (localPipVideo) localPipVideo.srcObject = null;
+    if (previewVideo) previewVideo.srcObject = null;
 
     window.sharedCanvasManager.clearCanvas(false);
     window.videoStickersManager.setSticker('none');
@@ -565,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function copyMeetingLink() {
     const inviteUrl = `${window.location.origin}/?room=${encodeURIComponent(targetRoomId)}&mode=${currentMode}`;
     navigator.clipboard.writeText(inviteUrl).then(() => {
-      showToast('📋 Meeting link copied to clipboard! Share it with family.');
+      showToast('📋 Meeting link copied to clipboard! Share it with family & team.');
     }).catch(() => {
       showToast(`Link: ${inviteUrl}`);
     });
@@ -602,6 +797,38 @@ document.addEventListener('DOMContentLoaded', () => {
       window.webRTCManager.broadcastData('ring-call', {});
       showToast('🔔 Ringing other devices in this room!');
     });
+
+    // Layout Toggle Button (Grid vs Spotlight)
+    if (btnToggleLayout) {
+      btnToggleLayout.addEventListener('click', () => {
+        if (currentViewMode === 'grid') {
+          currentViewMode = 'spotlight';
+          if (!spotlightTargetUserId && remotePeers.size > 0) {
+            spotlightTargetUserId = remotePeers.keys().next().value;
+          }
+          layoutIcon.textContent = '⭐';
+          layoutLabel.textContent = 'Spotlight';
+          showToast('⭐ Switched to Spotlight View');
+        } else {
+          currentViewMode = 'grid';
+          spotlightTargetUserId = null;
+          layoutIcon.textContent = '🔲';
+          layoutLabel.textContent = 'Grid View';
+          showToast('🔲 Switched to Grid View');
+        }
+        renderVideoStage();
+      });
+    }
+
+    if (btnExitSpotlight) {
+      btnExitSpotlight.addEventListener('click', () => {
+        currentViewMode = 'grid';
+        spotlightTargetUserId = null;
+        if (layoutIcon) layoutIcon.textContent = '🔲';
+        if (layoutLabel) layoutLabel.textContent = 'Grid View';
+        renderVideoStage();
+      });
+    }
 
     wordTags.forEach((tag) => {
       tag.addEventListener('click', () => {
@@ -708,7 +935,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btnVolumeBoost.addEventListener('click', () => {
       isVolumeBoosted = !isVolumeBoosted;
       if (window.soundEngine) {
-        window.soundEngine.setVolumeBoost(remoteVideo, isVolumeBoosted);
+        document.querySelectorAll('video').forEach((v) => {
+          if (v !== previewVideo && v !== localPipVideo && v !== screenSharePreviewVideo) {
+            window.soundEngine.setVolumeBoost(v, isVolumeBoosted);
+          }
+        });
       }
       updateControlButtons();
       showToast(isVolumeBoosted ? '🔊 Audio Volume Boosted 2.5x!' : '🔉 Normal Audio Level');
